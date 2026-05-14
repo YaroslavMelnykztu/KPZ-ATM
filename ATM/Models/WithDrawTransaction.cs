@@ -12,7 +12,7 @@ namespace ATM.Models
 
         public override string GetDetails()
         {
-            return "Withdrawal: " + Amount + " | Commission: " + Commission;
+            return "Знято: " + Amount + " | Комісія: " + Commission;
         }
     }
 }
