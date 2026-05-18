@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace ATM.Services
 {
@@ -7,6 +7,7 @@ namespace ATM.Services
         public bool IsValidAmount(string input, out double validAmount)
         {
             validAmount = 0;
+
             if (double.TryParse(input, out double amount))
             {
                 if (amount > 0 && amount <= 100000)
@@ -15,7 +16,21 @@ namespace ATM.Services
                     return true;
                 }
             }
+
             return false;
+        }
+
+        private bool ContainsOnlyDigits(string text)
+        {
+            foreach (char c in text)
+            {
+                if (!char.IsDigit(c))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         public bool IsValidCardNumber(string cardNumber)
@@ -30,14 +45,7 @@ namespace ATM.Services
                 return false;
             }
 
-            foreach (char c in cardNumber)
-            {
-                if (!char.IsDigit(c))
-                {
-                    return false;
-                }
-            }
-            return true;
+            return ContainsOnlyDigits(cardNumber);
         }
 
         public bool IsValidPin(string pin)
@@ -52,14 +60,7 @@ namespace ATM.Services
                 return false;
             }
 
-            foreach (char c in pin)
-            {
-                if (!char.IsDigit(c))
-                {
-                    return false;
-                }
-            }
-            return true;
+            return ContainsOnlyDigits(pin);
         }
     }
 }
