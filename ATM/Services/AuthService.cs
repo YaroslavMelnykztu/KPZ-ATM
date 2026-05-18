@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -22,8 +22,10 @@ namespace ATM.Services
 
         public Account Login(string cardNumber, string pin)
         {
-            var account = _accounts.FirstOrDefault(a => a.CardNumber == cardNumber && a.PinCode == pin);
-            return account;
+            return _accounts.FirstOrDefault(account =>
+                account.CardNumber == cardNumber &&
+                account.PinCode == pin
+            );
         }
     }
 }
