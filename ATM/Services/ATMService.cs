@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using ATM.Data;
 using ATM.Models;
 using ATM.Strategies;
@@ -11,77 +9,64 @@ namespace ATM.Services
 {
     public class ATMService
     {
-        private ICommissionStrategy _commission;
-        private FileStorage _storage;
+        private readonly ICommissionStrategy _commission;
+        private readonly FileStorage _storage;
         private List<Account> _accounts;
 
         public ATMService(ICommissionStrategy strategy)
         {
-            this._commission = strategy;
-            this._storage = FileStorage.GetInstance();
-            this._accounts = _storage.LoadAccounts();
+            _commission = strategy;
+            _storage = FileStorage.GetInstance();
+            _accounts = _storage.LoadAccounts();
         }
 
-        public double GetBalance(string cardNumber)
+        private Account GetAccount(string cardNumber) =>
+            _accounts.FirstOrDefault(a => a.CardNumber == cardNumber);
+
+        private void CommitTransaction(string logMessage)
         {
-            Account account = _accounts.FirstOrDefault(a => a.CardNumber == cardNumber);
-            if (account != null)
-            {
-                return account.Balance;
-            }
-            return 0;
+            _storage.SaveAccounts(_accounts);
+            _storage.LogTransaction(logMessage);
         }
+
+        public double GetBalance(string cardNumber) =>
+            GetAccount(cardNumber)?.Balance ?? 0;
 
         public bool Withdraw(string cardNumber, double amount)
         {
-            Account account = _accounts.FirstOrDefault(a => a.CardNumber == cardNumber);
-
-            if (account == null) return false;
+            var account = GetAccount(cardNumber);
+            if (account == null) return false; 
 
             double fee = _commission.Calculate(amount);
             double total = amount + fee;
 
-            if (account.Balance >= total)
-            {
-                account.Balance -= total;
-                _storage.SaveAccounts(_accounts);
-                _storage.LogTransaction("Зняття: " + amount + " | Комісія: " + fee + " | Карта: " + cardNumber);
-                return true;
-            }
-
-            return false;
+            if (account.Balance < total) return false; 
+            account.Balance -= total;
+            CommitTransaction($"Зняття: {amount} | Комісія: {fee} | Карта: {cardNumber}");
+            return true;
         }
 
         public bool Deposit(string cardNumber, double amount)
         {
-            Account account = _accounts.FirstOrDefault(a => a.CardNumber == cardNumber);
+            var account = GetAccount(cardNumber);
+            if (account == null) return false;
 
-            if (account != null)
-            {
-                account.Balance += amount;
-                _storage.SaveAccounts(_accounts);
-                _storage.LogTransaction("Поповнення: " + amount + " | Карта: " + cardNumber);
-                return true;
-            }
-
-            return false;
+            account.Balance += amount;
+            CommitTransaction($"Поповнення: {amount} | Карта: {cardNumber}");
+            return true;
         }
 
         public bool Transfer(string fromCard, string toCard, double amount)
         {
-            Account sender = _accounts.FirstOrDefault(a => a.CardNumber == fromCard);
-            Account receiver = _accounts.FirstOrDefault(a => a.CardNumber == toCard);
+            var sender = GetAccount(fromCard);
+            var receiver = GetAccount(toCard);
 
-            if (sender != null && receiver != null && sender.Balance >= amount)
-            {
-                sender.Balance -= amount;
-                receiver.Balance += amount;
-                _storage.SaveAccounts(_accounts);
-                _storage.LogTransaction("Переказ: " + amount + " з " + fromCard + " на " + toCard);
-                return true;
-            }
+            if (sender == null || receiver == null || sender.Balance < amount) return false;
 
-            return false;
+            sender.Balance -= amount;
+            receiver.Balance += amount;
+            CommitTransaction($"Переказ: {amount} з {fromCard} на {toCard}");
+            return true;
         }
     }
 }
