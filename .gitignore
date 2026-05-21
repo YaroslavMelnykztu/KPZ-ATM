@@ -482,3 +482,7 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Локальні дані ATM (генеруються під час роботи програми)
+database.json
+transactions.log

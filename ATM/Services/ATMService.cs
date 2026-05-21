@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using ATM.Data;
 using ATM.Models;
 using ATM.Strategies;
@@ -17,71 +15,61 @@ namespace ATM.Services
 
         public ATMService(ICommissionStrategy strategy)
         {
-            this._commission = strategy;
-            this._storage = FileStorage.GetInstance();
-            this._accounts = _storage.LoadAccounts();
+            _commission = strategy;
+            _storage = FileStorage.GetInstance();
+            _accounts = _storage.LoadAccounts();
         }
 
         public double GetBalance(string cardNumber)
         {
-            Account account = _accounts.FirstOrDefault(a => a.CardNumber == cardNumber);
-            if (account != null)
-            {
-                return account.Balance;
-            }
-            return 0;
+            return FindAccount(cardNumber)?.Balance ?? 0;
         }
 
         public bool Withdraw(string cardNumber, double amount)
         {
-            Account account = _accounts.FirstOrDefault(a => a.CardNumber == cardNumber);
-
+            Account account = FindAccount(cardNumber);
             if (account == null) return false;
 
             double fee = _commission.Calculate(amount);
             double total = amount + fee;
+            if (account.Balance < total) return false;
 
-            if (account.Balance >= total)
-            {
-                account.Balance -= total;
-                _storage.SaveAccounts(_accounts);
-                _storage.LogTransaction("Зняття: " + amount + " | Комісія: " + fee + " | Карта: " + cardNumber);
-                return true;
-            }
-
-            return false;
+            account.Balance -= total;
+            return CommitTransaction($"Зняття: {amount} | Комісія: {fee} | Карта: {cardNumber}");
         }
 
         public bool Deposit(string cardNumber, double amount)
         {
-            Account account = _accounts.FirstOrDefault(a => a.CardNumber == cardNumber);
+            Account account = FindAccount(cardNumber);
+            if (account == null) return false;
 
-            if (account != null)
-            {
-                account.Balance += amount;
-                _storage.SaveAccounts(_accounts);
-                _storage.LogTransaction("Поповнення: " + amount + " | Карта: " + cardNumber);
-                return true;
-            }
-
-            return false;
+            account.Balance += amount;
+            return CommitTransaction($"Поповнення: {amount} | Карта: {cardNumber}");
         }
 
         public bool Transfer(string fromCard, string toCard, double amount)
         {
-            Account sender = _accounts.FirstOrDefault(a => a.CardNumber == fromCard);
-            Account receiver = _accounts.FirstOrDefault(a => a.CardNumber == toCard);
+            Account sender = FindAccount(fromCard);
+            Account receiver = FindAccount(toCard);
 
-            if (sender != null && receiver != null && sender.Balance >= amount)
-            {
-                sender.Balance -= amount;
-                receiver.Balance += amount;
-                _storage.SaveAccounts(_accounts);
-                _storage.LogTransaction("Переказ: " + amount + " з " + fromCard + " на " + toCard);
-                return true;
-            }
+            if (sender == null || receiver == null || sender.Balance < amount)
+                return false;
 
-            return false;
+            sender.Balance -= amount;
+            receiver.Balance += amount;
+            return CommitTransaction($"Переказ: {amount} з {fromCard} на {toCard}");
+        }
+
+        private Account FindAccount(string cardNumber)
+        {
+            return _accounts.FirstOrDefault(a => a.CardNumber == cardNumber);
+        }
+
+        private bool CommitTransaction(string logMessage)
+        {
+            _storage.SaveAccounts(_accounts);
+            _storage.LogTransaction(logMessage);
+            return true;
         }
     }
 }
