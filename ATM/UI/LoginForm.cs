@@ -20,11 +20,8 @@ namespace ATM.UI
             string card = txtCardNumber.Text;
             string pin = txtPin.Text;
 
-            FileStorage storage = FileStorage.GetInstance();
-            System.Collections.Generic.List<Account> accounts = storage.LoadAccounts();
-            PasswordHasher hasher = new PasswordHasher();
-
-            Account user = accounts.FirstOrDefault(a => a.CardNumber == card && hasher.VerifyPassword(pin, a.PinCode));
+            AuthService authService = new AuthService();
+            Account user = authService.Login(card, pin);
 
             if (user != null)
             {
