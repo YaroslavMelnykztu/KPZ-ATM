@@ -14,16 +14,22 @@ namespace ATM.Services
     public class AuthService
     {
         private List<Account> _accounts;
+        private PasswordHasher _hasher;
 
         public AuthService()
         {
             _accounts = FileStorage.GetInstance().LoadAccounts();
+            _hasher = new PasswordHasher();
         }
 
         public Account Login(string cardNumber, string pin)
         {
-            var account = _accounts.FirstOrDefault(a => a.CardNumber == cardNumber && a.PinCode == pin);
-            return account;
+            var account = _accounts.FirstOrDefault(a => a.CardNumber == cardNumber);
+            if (account != null && _hasher.VerifyPassword(pin, account.PinCode))
+            {
+                return account;
+            }
+            return null;
         }
     }
 }

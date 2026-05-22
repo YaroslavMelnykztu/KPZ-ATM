@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using ATM.Data;
 using ATM.Models;
 using ATM.Strategies;
+using ATM.Factories;
 
 namespace ATM.Services
 {
@@ -14,28 +15,36 @@ namespace ATM.Services
         private ICommissionStrategy _commission;
         private FileStorage _storage;
         private List<Account> _accounts;
+        private TransactionFactory _factory;
 
         public ATMService(ICommissionStrategy strategy)
         {
             this._commission = strategy;
             this._storage = FileStorage.GetInstance();
             this._accounts = _storage.LoadAccounts();
+            this._factory = new TransactionFactory();
+        }
+
+        private Account GetAccount(string cardNumber)
+        {
+            return _accounts.FirstOrDefault(a => a.CardNumber == cardNumber);
+        }
+
+        private void SaveAndLog(BaseTransaction transaction, string cardNumber)
+        {
+            _storage.SaveAccounts(_accounts);
+            _storage.LogTransaction(transaction.GetDetails() + " | Карта: " + cardNumber);
         }
 
         public double GetBalance(string cardNumber)
         {
-            Account account = _accounts.FirstOrDefault(a => a.CardNumber == cardNumber);
-            if (account != null)
-            {
-                return account.Balance;
-            }
-            return 0;
+            Account account = GetAccount(cardNumber);
+            return account?.Balance ?? 0;
         }
 
         public bool Withdraw(string cardNumber, double amount)
         {
-            Account account = _accounts.FirstOrDefault(a => a.CardNumber == cardNumber);
-
+            Account account = GetAccount(cardNumber);
             if (account == null) return false;
 
             double fee = _commission.Calculate(amount);
@@ -44,8 +53,8 @@ namespace ATM.Services
             if (account.Balance >= total)
             {
                 account.Balance -= total;
-                _storage.SaveAccounts(_accounts);
-                _storage.LogTransaction("Зняття: " + amount + " | Комісія: " + fee + " | Карта: " + cardNumber);
+                var transaction = _factory.CreateWithdraw(amount, fee);
+                SaveAndLog(transaction, cardNumber);
                 return true;
             }
 
@@ -54,30 +63,26 @@ namespace ATM.Services
 
         public bool Deposit(string cardNumber, double amount)
         {
-            Account account = _accounts.FirstOrDefault(a => a.CardNumber == cardNumber);
+            Account account = GetAccount(cardNumber);
+            if (account == null) return false;
 
-            if (account != null)
-            {
-                account.Balance += amount;
-                _storage.SaveAccounts(_accounts);
-                _storage.LogTransaction("Поповнення: " + amount + " | Карта: " + cardNumber);
-                return true;
-            }
-
-            return false;
+            account.Balance += amount;
+            var transaction = _factory.CreateDeposit(amount);
+            SaveAndLog(transaction, cardNumber);
+            return true;
         }
 
         public bool Transfer(string fromCard, string toCard, double amount)
         {
-            Account sender = _accounts.FirstOrDefault(a => a.CardNumber == fromCard);
-            Account receiver = _accounts.FirstOrDefault(a => a.CardNumber == toCard);
+            Account sender = GetAccount(fromCard);
+            Account receiver = GetAccount(toCard);
 
             if (sender != null && receiver != null && sender.Balance >= amount)
             {
                 sender.Balance -= amount;
                 receiver.Balance += amount;
-                _storage.SaveAccounts(_accounts);
-                _storage.LogTransaction("Переказ: " + amount + " з " + fromCard + " на " + toCard);
+                var transaction = _factory.CreateTransfer(amount, toCard);
+                SaveAndLog(transaction, fromCard);
                 return true;
             }
 
